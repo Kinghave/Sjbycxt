@@ -1,0 +1,70 @@
+version: '3.9'
+
+services:
+  # ── 前端 Nginx 静态服务 ──────────────────────────────────
+  frontend:
+    image: nginx:alpine
+    container_name: wc_frontend
+    ports:
+      - "8021:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  # ── FastAPI 后端 ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wc_backend
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://wcuser:${DB_PASSWORD}@postgres:5432/worldcup
+    ports:
+      - "8022:8000"
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Redis 缓存 ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: wc_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # ── PostgreSQL 数据库 ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: wc_postgres
+    environment:
+      - POSTGRES_USER=wcuser
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme123}
+      - POSTGRES_DB=worldcup
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:

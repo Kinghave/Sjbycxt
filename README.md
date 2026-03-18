@@ -83,11 +83,6 @@ GET /api/historical/{team_a}/{team_b}
 GET /api/teams
 ```
 
-## 广告解锁逻辑
-
-- 默认开放前 2 场比赛的基础预测
-- 观看 5 秒广告后解锁当日全部赛事 AI 深度分析
-- 集成 Google AdMob / 其他广告平台
 
 ## 常见问题
 
